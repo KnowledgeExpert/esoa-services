@@ -1,0 +1,282 @@
+swagger: '2.0'
+
+info:
+  version: "1.1.0"
+  title: ESOA Services
+  description: "Services for the ESOA course"
+  contact:
+    name: "LABORATORY FOR SYSTEMIC MODELING LAMS"
+    email: "lams@epfl.ch"
+
+schemes:
+  - https
+basePath: /prweb/PRRestService
+host: kexpert01.pegalabs.io
+
+securityDefinitions:
+  UserSecurity:
+    type: basic
+    description: the service supports basic authentication for exercise purposes.
+security:
+  - UserSecurity: []
+
+tags:
+  - name: BE
+    description: operations provided by BE
+  - name: AllCanDo
+    description: operations provided by AllCanDo
+
+paths:
+  /BE/v2/partner/garage/{location}:
+    get:
+      description: Get garage details
+      operationId: FindGarageInfo
+      tags: [BE]
+      produces:
+        - application/json
+      parameters:
+        - name: location
+          in: path
+          required: true
+          description: location associated with garage - can be specified as an address or a comma-separated latitude and longitude
+          type: string
+          example: "46.518800, 6.561913"
+
+      responses:
+        200:
+          schema:
+            type: object
+            required: [garageID,name,salesRep]
+            properties:
+              garageID:
+                type: string
+              name:
+                type: string
+              salesRep:
+                type: string
+          description: garage details
+          examples:
+            application/json:
+              {
+                  "garageID": "G_001" ,
+                  "name": "Best Local Garage" ,
+                  "salesRep" : "epflesoapega@mailinator.com"
+              }
+        404:
+          schema:
+            type: object
+            properties:
+              errors:
+                description: list of errors encountered
+                schema:
+                  type: array
+          description: Not found
+          examples:
+            application/json:
+              {
+                "errors":[ { "message":"Unknown garage" } ]
+              }
+
+  /BE/v2/engine/diagnostic:
+    post:
+      description: |
+        Completes a `Diagnostic` on an engine.
+        Serial numbers with the letter `d` result in a defective diagnosis.
+        Furthermore, the presence of absence of the digit `1` affect the defective part.
+      operationId: FindDiagnostic
+      tags: [BE]
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - $ref: "#/parameters/garageId"
+          
+        - name: engineSerialNumber
+          type: string
+          in: query
+          description: serial number together with diagnostic information (simulates all the engine information)
+          required: true
+          example: 000162938-abcd
+
+      responses:
+        201:
+          description: Diagnostic complete
+          schema:
+            type: object
+            required: [id, status]
+            properties:
+              id:
+                type: string
+              status:
+                type: string
+                enum:
+                  - faultless
+                  - defective
+              defectivePart:
+                description: if status is defective, indicates the part that needs replacement
+                type: object
+                properties:
+                  issueDescription:
+                    type: string
+                  partNumber:
+                    type: string
+                  maintenanceCertification:
+                    type: string
+          examples:
+            application/json:
+              {
+                "id": "D-27",
+                "status": "defective",
+                "defectivePart":
+                {
+                  "issueDescription": "Operating parameters exceeded",
+                  "partNumber": "P_C41_001",
+                  "maintenanceCertification": "A1"
+                }
+              }
+        422:
+          $ref: "#/responses/Standard422ErrorResponse"
+                  
+
+  /BE/v2/part/order:
+    post:
+      description: Order a replacement `Part`, the date returned includes the shipment and it is the date of delivery at the garage (including packaging and shipment)
+      operationId: FindPartAvailability
+      tags: [BE]
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - $ref: "#/parameters/garageId"
+        
+        - name: partNumber
+          in: query
+          description: identifying number of part to order
+          required: true
+          type: string
+          example: P_C41_001
+          
+        - name: location
+          in: query
+          description: address or coordinates to ship the part to
+          required: true
+          type: string
+          example: "46.518800, 6.561913"
+
+      responses:
+        201:
+          schema:
+            type: object
+            required: [deliveryDate,id]
+            properties:
+              deliveryDate:
+                type: string
+                format: date-time
+              id:
+                 $ref: "#/definitions/id"
+          description: garage details
+          examples:
+            application/json:
+              {
+                "deliveryDate":"2023-06-08T22:12:26.603Z",
+                "id":"O-45"
+              }
+        422:
+          $ref: "#/responses/Standard422ErrorResponse"
+
+  /AllCanDo/v2/technician/engagement:
+    post:
+      description: Book a `Technician` to install a replacement `Part`.
+      operationId: ReserveTechnician
+      tags: [AllCanDo]
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - $ref: "#/parameters/garageId"
+
+        - name: location
+          in: query
+          description: address or coordinates where to dispatch the technician
+          required: true
+          type: string
+          example: "46.518800, 6.561913"
+
+        - name: certification
+          in: query
+          description: certification required to work on the parts
+          required: true
+          type: string
+          example: A1
+
+        - name: expectedDate
+          in: query
+          description: when parts are expected to be available
+          required: true
+          type: string
+          format: date-time
+          example: "2023-06-08T22:12:26.603Z"
+          
+      responses:
+        201:
+          description: Engagement details
+          schema:
+            type: object
+            required: [dateTime,name,id,status]
+            properties:
+              dateTime:
+                description: confirmed date of the engagement
+                type: string
+                format: date-time
+              name:
+                description: name of the technician
+                type: string
+              status:
+                description: status of the reservation
+                type: string
+                enum:
+                  - reserved
+                  - not available
+              id:
+                 $ref: "#/definitions/id"
+          examples:
+            application/json:
+              {
+                "dateTime":"2023-06-08T22:12:26.603Z",
+                "name":"Jane Smith",
+                "id":"E-45",
+                "status":"reserved"
+              }
+        422:
+          $ref: "#/responses/Standard422ErrorResponse"
+          
+responses:
+  Standard422ErrorResponse:
+    description: Invalid request
+    schema:
+      type: object
+      properties:
+        errors:
+           description: list of errors encountered
+           schema:
+              type: array
+    examples:
+      application/json:
+        { "errors":[ { "message":".garage.garageID: ** Unknown garage"} ] }
+
+parameters:
+  garageId:
+    name: garageID
+    in: query
+    required: true
+    description: ID of the garage
+    type: string
+    example: G_001
+
+definitions:
+  id:
+    description: case ID
+    type: string
