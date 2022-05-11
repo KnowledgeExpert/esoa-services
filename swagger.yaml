@@ -10,7 +10,7 @@ info:
 
 schemes:
   - https
-basePath: /prweb/PRRestService
+basePath: /prweb/api
 host: kexpert01.pegalabs.io
 
 securityDefinitions:
